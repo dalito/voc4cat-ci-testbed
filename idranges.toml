@@ -42,9 +42,9 @@ Sofia Garcia https://orcid.org/0000-0001-2345-6789
 """
 
 # Optional: Publisher(s) - multi-line text, each line: "<name> <orcid-URL or ror-URL>"
-# publisher = """
-# Example Organization https://ror.org/04fa4r544
-# """
+publisher = """
+Example Organization https://ror.org/04fa4r544
+"""
 
 # Optional: Custodian(s) - multi-line text, each line: "<name> <orcid-URL or ror-URL>"
 # custodian = """
