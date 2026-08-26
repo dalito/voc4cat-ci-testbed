@@ -127,6 +127,8 @@ jobs:
           # Needed to push the commit below. No tool runs over the tree while
           # the credential is on disk.
           persist-credentials: true
+          # TESTBED ONLY - probing whether the push to a fork works at all.
+          allow-unsafe-pr-checkout: true
 
       - name: Apply converted vocabulary and stage changes
         id: apply
