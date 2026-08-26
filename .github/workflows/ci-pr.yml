@@ -64,8 +64,18 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: Checkout main branch into directory _main_branch/
-        # Supplies the baseline that "voc4cat check --ci-pre" and "--ci-post"
-        # compare the submitted vocabulary against.
+        # Supplies two things that every voc4cat call below depends on:
+        #
+        # - idranges.toml. The config is always read from main, never from the
+        #   pull request, so the ID ranges enforced are the ones already
+        #   approved there. A pull request therefore cannot allocate itself a
+        #   range and use it in the same pull request: the allocation has to be
+        #   reviewed and merged first, and only then can the IDs be used. Do
+        #   not change these paths to the branch copy without replacing that
+        #   control - it predates the pull_request_target mitigation and is not
+        #   a leftover of it.
+        # - vocabularies/, the baseline that "check --ci-pre" and "--ci-post"
+        #   compare the submission against.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: main
@@ -101,25 +111,25 @@ jobs:
         run: |
           voc4cat --version
           # check inbox file names
-          voc4cat check --config idranges.toml --logfile outbox/voc4cat.log --ci-pre inbox-excel-vocabs/ _main_branch/vocabularies
+          voc4cat check --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --ci-pre inbox-excel-vocabs/ _main_branch/vocabularies
           # check xlsx file(s). If the check fails, write annotated file to outbox.
-          voc4cat check --config idranges.toml --logfile outbox/voc4cat.log --outdir outbox inbox-excel-vocabs/
+          voc4cat check --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox inbox-excel-vocabs/
 
       - name: Run voc4cat (convert)
         run: |
           # convert file(s) from xlsx in inbox to turtle in outbox
-          voc4cat convert --config idranges.toml --logfile outbox/voc4cat.log --outdir outbox inbox-excel-vocabs/
+          voc4cat convert --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox inbox-excel-vocabs/
           if [ ! -f outbox/*.ttl ]; then
             echo "No ttl file in outbox. Building joined vocabulary ttl-file from individual ttl-files in vocabulary."
-            voc4cat transform --join --config idranges.toml --logfile outbox/voc4cat.log --outdir outbox/ vocabularies/
+            voc4cat transform --join --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox/ vocabularies/
           fi
 
       - name: Run voc4cat (post-convert checks)
         run: |
           # check all ttl file(s) in outbox
-          voc4cat check --redundant-hierarchies --config idranges.toml --logfile outbox/voc4cat.log outbox/
+          voc4cat check --redundant-hierarchies --config _main_branch/idranges.toml --logfile outbox/voc4cat.log outbox/
           # check if vocabulary changes are allowed
-          voc4cat check --config idranges.toml --logfile outbox/voc4cat.log --ci-post _main_branch/vocabularies outbox/
+          voc4cat check --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --ci-post _main_branch/vocabularies outbox/
 
       - name: Run voc4cat (build HTML documentation)
         run: |
@@ -127,21 +137,21 @@ jobs:
 
       - name: Split vocabulary, merge into vocabulary dir (in PR branch) and update provenance info
         run: |
-          voc4cat transform --split --inplace  --config idranges.toml --logfile outbox/voc4cat.log --outdir outbox_new_voc outbox/
+          voc4cat transform --split --inplace  --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox_new_voc outbox/
           voc4cat-merge --logfile outbox/voc4cat.log  outbox_new_voc/ vocabularies/
           # copy xlsx to outbox so that the xlsx file is part of the artifact
           find inbox-excel-vocabs -name '*.xlsx' -exec cp {} -t outbox/ \;
           git status
           # Add/update dct:created and dct:modified base on git history
-          voc4cat transform --prov-from-git --diff-base origin/main --inplace --config idranges.toml --logfile outbox/voc4cat.log vocabularies/
+          voc4cat transform --prov-from-git --diff-base origin/main --inplace --config _main_branch/idranges.toml --logfile outbox/voc4cat.log vocabularies/
 
       - name: Run voc4cat (re-build updated Excel file and joined turtle vocabulary file)
         # Passing the config is important to make use of the prefixes therein.
         run: |
           mkdir -p outbox/updated-xlsx-ttl
-          voc4cat transform --join --config idranges.toml --logfile outbox/voc4cat.log --outdir outbox/updated-xlsx-ttl vocabularies/
+          voc4cat transform --join --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox/updated-xlsx-ttl vocabularies/
           # Using a template is optional and gives just a warning if missing.
-          voc4cat convert --config idranges.toml --logfile outbox/voc4cat.log --template templates/default_sheets.xlsx outbox/updated-xlsx-ttl
+          voc4cat convert --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --template templates/default_sheets.xlsx outbox/updated-xlsx-ttl
 
       - name: Store artifacts
         if: ${{ always() }}
