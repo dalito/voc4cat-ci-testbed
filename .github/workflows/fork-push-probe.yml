@@ -23,6 +23,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
           persist-credentials: true
+          allow-unsafe-pr-checkout: true
       - name: Try to push a commit to the PR branch
         run: |
           echo "probe $GITHUB_RUN_ID" > ci-push-probe.txt
