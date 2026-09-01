@@ -187,6 +187,12 @@ jobs:
               --author="$ACTOR <$ACTOR_ID+$ACTOR@users.noreply.github.com>" \
               -m "CI: vocabulary update in $RUN_URL"
 
+      - name: Install uv
+        if: >-
+          ${{ steps.validate.outputs.skip != 'true'
+              && steps.apply.outputs.skip != 'true' }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+
       - name: Drop the submitted spreadsheets from the branch history and push
         # Deleting the spreadsheet in a follow-up commit leaves the blob in the
         # branch's earlier commits, so a merge commit or a rebase merge carries
@@ -203,6 +209,7 @@ jobs:
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           ORIGINAL_TIP: ${{ steps.validate.outputs.head_sha }}
+          FILTER_REPO_VERSION: "2.47.0"
         run: |
           set -euo pipefail
           base=$(git merge-base base/main HEAD)
@@ -219,9 +226,8 @@ jobs:
           before=$(carriers | wc -l)
           echo "commits carrying a spreadsheet before the rewrite: $before"
           if [ "$before" -gt 0 ]; then
-            python -m pip install --quiet --disable-pip-version-check git-filter-repo
             # Scoped to the spreadsheets so that inbox-excel-vocabs/README.md stays.
-            git filter-repo --path-glob 'inbox-excel-vocabs/*.xlsx' --invert-paths --refs "$base..HEAD" --force
+            uvx "git-filter-repo@$FILTER_REPO_VERSION" --path-glob 'inbox-excel-vocabs/*.xlsx' --invert-paths --refs "$base..HEAD" --force
           fi
 
           after=$(carriers | wc -l)
