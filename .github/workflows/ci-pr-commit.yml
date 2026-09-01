@@ -162,8 +162,6 @@ jobs:
           cp -r "$RUNNER_TEMP/handoff/vocabularies" vocabularies
           # -A so that files the conversion removed are staged as deletions.
           git add -A vocabularies
-          # The submitted spreadsheets are cleaned up once converted.
-          git rm --quiet --ignore-unmatch -- 'inbox-excel-vocabs/*.xlsx'
           git status --short
 
       - name: Commit on behalf of the PR author
@@ -194,21 +192,24 @@ jobs:
         # branch's earlier commits, so a merge commit or a rebase merge carries
         # it into the history of main. Removing the path from every commit of
         # the branch makes the merge method irrelevant.
+        #
+        # Deliberately not gated on whether the commit step committed: a
+        # resubmission that changes no concept still has to have its
+        # spreadsheet removed. The job as a whole runs only for a conversion
+        # run that succeeded, so a failed check or conversion never gets here.
         if: >-
           ${{ steps.validate.outputs.skip != 'true'
-              && steps.apply.outputs.skip != 'true'
-              && steps.commit.outputs.skip != 'true' }}
+              && steps.apply.outputs.skip != 'true' }}
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          ORIGINAL_TIP: ${{ steps.validate.outputs.head_sha }}
         run: |
           set -euo pipefail
-          python -m pip install --quiet --disable-pip-version-check git-filter-repo
-
           base=$(git merge-base base/main HEAD)
-          echo "rewrite range: $base..$HEAD_BRANCH"
+          echo "rewrite range: $base..HEAD"
 
           carriers() {
-            for c in $(git rev-list "$base..$HEAD_BRANCH"); do
+            for c in $(git rev-list "$base..HEAD"); do
               if git ls-tree -r --name-only "$c" -- inbox-excel-vocabs | grep -q '[.]xlsx$'; then
                 echo "$c"
               fi
@@ -218,8 +219,9 @@ jobs:
           before=$(carriers | wc -l)
           echo "commits carrying a spreadsheet before the rewrite: $before"
           if [ "$before" -gt 0 ]; then
+            python -m pip install --quiet --disable-pip-version-check git-filter-repo
             # Scoped to the spreadsheets so that inbox-excel-vocabs/README.md stays.
-            git filter-repo --path-glob 'inbox-excel-vocabs/*.xlsx' --invert-paths --refs "$base..$HEAD_BRANCH" --force
+            git filter-repo --path-glob 'inbox-excel-vocabs/*.xlsx' --invert-paths --refs "$base..HEAD" --force
           fi
 
           after=$(carriers | wc -l)
@@ -229,7 +231,13 @@ jobs:
             exit 1
           fi
 
-          git push --force origin "$HEAD_BRANCH:$HEAD_BRANCH"
+          # Push when the vocabulary commit, the rewrite, or both moved the
+          # branch away from the tip the conversion ran against.
+          if [ "$(git rev-parse HEAD)" = "$ORIGINAL_TIP" ]; then
+            echo "::notice::Branch unchanged; nothing to push."
+            exit 0
+          fi
+          git push --force origin "HEAD:$HEAD_BRANCH"
 
       - name: Report failure on the pull request
         if: ${{ failure() }}
