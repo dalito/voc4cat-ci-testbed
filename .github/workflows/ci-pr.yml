@@ -22,7 +22,6 @@ env:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PIP_PROGRESS_BAR: "off"
   LOGLEVEL: "DEBUG"
-  RUN_URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -96,7 +95,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
 
           # Select to install a stable tagged version or main branch (in development)
-          python -m pip install git+https://github.com/nfdi4cat/voc4cat-tool.git@main
+          python -m pip install git+https://github.com/nfdi4cat/voc4cat-tool.git@v1.1.1
           # python -m pip install git+https://github.com/nfdi4cat/voc4cat-tool.git@main
 
           # install custom pylode 2.x  (adds sorted collections,
@@ -119,17 +118,25 @@ jobs:
         run: |
           # convert file(s) from xlsx in inbox to turtle in outbox
           voc4cat convert --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox inbox-excel-vocabs/
-          if [ ! -f outbox/*.ttl ]; then
+          if [ -z "$(ls outbox/*.ttl 2>/dev/null)" ]; then
             echo "No ttl file in outbox. Building joined vocabulary ttl-file from individual ttl-files in vocabulary."
             voc4cat transform --join --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --outdir outbox/ vocabularies/
           fi
 
       - name: Run voc4cat (post-convert checks)
+        env:
+          # The ID ranges belong to the contributor who submitted the concepts.
+          # GITHUB_ACTOR names whoever started the run, which is the CI bot for
+          # the run that the commit of ci-pr-commit.yml triggers, and that bot
+          # holds no range. See issue #136.
+          PR_AUTHOR: ${{ github.event.pull_request.user.login || github.actor }}
         run: |
           # check all ttl file(s) in outbox
           voc4cat check --redundant-hierarchies --config _main_branch/idranges.toml --logfile outbox/voc4cat.log outbox/
-          # check if vocabulary changes are allowed
-          voc4cat check --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --ci-post _main_branch/vocabularies outbox/
+          # check if vocabulary changes are allowed. GITHUB_ACTOR is replaced for
+          # this command only: the env key above and GITHUB_ENV both refuse to
+          # overwrite a GITHUB_* variable, a shell assignment does not.
+          GITHUB_ACTOR="$PR_AUTHOR" voc4cat check --config _main_branch/idranges.toml --logfile outbox/voc4cat.log --ci-post _main_branch/vocabularies outbox/
 
       - name: Run voc4cat (build HTML documentation)
         run: |
@@ -143,7 +150,7 @@ jobs:
           find inbox-excel-vocabs -name '*.xlsx' -exec cp {} -t outbox/ \;
           git status
           # Add/update dct:created and dct:modified base on git history
-          voc4cat transform --prov-from-git --diff-base origin/main --inplace --config _main_branch/idranges.toml --logfile outbox/voc4cat.log vocabularies/
+          voc4cat transform --prov-from-git --diff-base origin/main --modified-date "$(date +'%Y-%m-%d')" --inplace --config _main_branch/idranges.toml --logfile outbox/voc4cat.log vocabularies/
 
       - name: Run voc4cat (re-build updated Excel file and joined turtle vocabulary file)
         # Passing the config is important to make use of the prefixes therein.
@@ -157,7 +164,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: voc4cat-outbox_${{ env.RUN_DATE }}_run${{ GITHUB.RUN_ID }}
+          name: voc4cat-outbox_${{ env.RUN_DATE }}_run${{ github.run_id }}
           path: outbox/
 
       - name: Assemble hand-off for the commit workflow

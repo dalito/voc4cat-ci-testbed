@@ -129,6 +129,14 @@ gh_name = "another-contributor"
 orcid = ""
 ror_id = ""
 
+[[vocabs.vocab_example.id_range]]
+first_id = 21
+last_id = 40
+gh_name = "dalito"
+name = "David Linke"
+orcid = "0000-0002-5898-1820"
+ror_id = "https://ror.org/029hg0311"
+
 # Continue with as many [[vocabs.vocab_example.idrange]] sections as needed.
 
 # More vocabularies can be configured by adding sections with appropriate name.
