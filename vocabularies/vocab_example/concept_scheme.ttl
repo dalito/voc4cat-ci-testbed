@@ -16,7 +16,8 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
     skos:hasTopConcept
         <https://example.org/test/0000001> ,
         <https://example.org/test/0000003> ,
-        <https://example.org/test/0000021> ;
+        <https://example.org/test/0000021> ,
+        <https://example.org/test/0000022> ;
     skos:historyNote "Created 2025-01-01."@en ;
     skos:prefLabel "My Vocabulary"@en ;
     dcat:contactPoint <https://orcid.org/0000-0001-2345-6789> ;
